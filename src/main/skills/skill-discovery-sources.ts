@@ -140,6 +140,14 @@ export function buildSkillDiscoverySources(
       'omp'
     ),
     source(
+      'home-prime-agent',
+      'Prime Agent home',
+      pathApi.join(home, '.prime', 'agent', 'skills'),
+      'home',
+      ['agent-skills'],
+      'prime-agent'
+    ),
+    source(
       'home-antigravity',
       'Antigravity home',
       pathApi.join(home, '.gemini', 'antigravity', 'skills'),

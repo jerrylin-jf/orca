@@ -32,7 +32,7 @@ type RemoveOptions = {
 }
 
 export function isAgentStatusHooksEnabled(
-  settings: Pick<GlobalSettings, 'agentStatusHooksEnabled'> | null | undefined
+  settings: Partial<Pick<GlobalSettings, 'agentStatusHooksEnabled'>> | null | undefined
 ): boolean {
   return settings?.agentStatusHooksEnabled !== false
 }
