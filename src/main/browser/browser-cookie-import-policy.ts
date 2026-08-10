@@ -54,9 +54,11 @@ export function normalizeCookieImportDomain(domain: string): string | null {
 }
 
 export function isGoogleSourceBoundCookie(name: string, domain: string): boolean {
-  if (!GOOGLE_SOURCE_BOUND_COOKIE_NAMES.has(name)) {
-    return false
-  }
+  return GOOGLE_SOURCE_BOUND_COOKIE_NAMES.has(name) && isGoogleSessionDomain(domain)
+}
+
+// Why: Google sessions are server-bound to the source browser, so any imported google.com cookie dies within ~1h (STA-3811); presence only informs the sign-in notice.
+export function isGoogleSessionDomain(domain: string): boolean {
   const normalized = normalizeCookieDomain(domain)
   return normalized === 'google.com' || normalized?.endsWith('.google.com') === true
 }

@@ -75,6 +75,7 @@ import type {
 } from '../../shared/types'
 import { browserSessionRegistry } from './browser-session-registry'
 import {
+  isGoogleSessionDomain,
   isGoogleSourceBoundCookie,
   normalizeCookieDomain,
   normalizeCookieImportDomain,
@@ -684,7 +685,9 @@ async function importValidatedCookies(
     totalCookies: totalInput,
     importedCookies: importedCount,
     skippedCookies: skipped,
-    domains: [...domainSet].sort()
+    domains: [...domainSet].sort(),
+    // Why: checked on the source snapshot (pre-filter) — the notice is about what the user tried to import.
+    googleCookiesPresent: cookies.some((cookie) => isGoogleSessionDomain(cookie.domain))
   }
 
   return { ok: true, profileId: '', summary }
@@ -1570,6 +1573,11 @@ export async function importCookiesFromBrowser(
 
     diag(`  source has ${sourceRows.length} cookies`)
 
+    // Why: checked on the source snapshot (pre-filter) — the notice is about what the user tried to import.
+    const googleCookiesPresent = sourceRows.some(
+      (row) => typeof row.host_key === 'string' && isGoogleSessionDomain(row.host_key)
+    )
+
     if (sourceRows.length === 0) {
       closeStagingDb()
       discardStagingFile()
@@ -1730,7 +1738,8 @@ export async function importCookiesFromBrowser(
           totalCookies: sourceRows.length,
           importedCookies: 0,
           skippedCookies: skipped + integritySkipped,
-          domains: []
+          domains: [],
+          googleCookiesPresent
         }
       }
     }
@@ -1818,6 +1827,7 @@ export async function importCookiesFromBrowser(
       importedCookies: imported,
       skippedCookies: skipped + integritySkipped,
       domains: [...domainSet].sort(),
+      googleCookiesPresent,
       ...(warning ? { warning } : {})
     }
 
