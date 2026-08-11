@@ -2549,6 +2549,7 @@ export type PreloadApi = {
     pickAttachment: () => Promise<string | null>
     pickImage: () => Promise<string | null>
     pickRepoIconImage: () => Promise<{ dataUrl: string; fileName: string } | null>
+    pickOpenInAppIcon: () => Promise<{ dataUrl: string; label: string } | null>
     pickAudio: () => Promise<string | null>
     pickDirectory: (args: { defaultPath?: string }) => Promise<string | null>
     copyFile: (args: { srcPath: string; destPath: string }) => Promise<void>

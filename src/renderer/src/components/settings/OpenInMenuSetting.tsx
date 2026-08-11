@@ -2,7 +2,9 @@ import type React from 'react'
 import { useState } from 'react'
 import { Check, ChevronDown, Pencil, Trash2 } from 'lucide-react'
 import type { GlobalSettings, OpenInApplication } from '../../../../shared/types'
+import type { OpenInAppIcon } from '../../../../shared/open-in-app-icons'
 import { OPEN_IN_APPLICATIONS_MAX } from '../../../../shared/open-in-applications'
+import { OpenInAppIconPicker } from './OpenInAppIconPicker'
 import { Button } from '../ui/button'
 import {
   DropdownMenu,
@@ -43,6 +45,18 @@ function createOpenInApplication(): OpenInApplication {
   }
 }
 
+export function withOpenInApplicationIcon(
+  application: OpenInApplication,
+  icon: OpenInAppIcon | null
+): OpenInApplication {
+  if (icon) {
+    return { ...application, icon }
+  }
+  const next = { ...application }
+  delete next.icon
+  return next
+}
+
 export function createPresetOpenInApplication(preset: OpenInAppPreset): OpenInApplication {
   return {
     id: preset.id,
@@ -81,6 +95,7 @@ function OpenInMenuRow({
   onEditToggle,
   onRemove,
   onChange,
+  onIconChange,
   onCommit
 }: {
   application: OpenInApplication
@@ -88,6 +103,7 @@ function OpenInMenuRow({
   onEditToggle: () => void
   onRemove: () => void
   onChange: (updates: Pick<OpenInApplication, 'label' | 'command'>) => void
+  onIconChange: (icon: OpenInAppIcon | null) => void
   onCommit: () => void
 }): React.JSX.Element {
   const preset = getOpenInAppPreset(application)
@@ -99,9 +115,7 @@ function OpenInMenuRow({
   return (
     <div className="py-3">
       <div className="flex flex-wrap items-start gap-3">
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border/50 bg-background/50">
-          <OpenInApplicationIcon application={application} size={16} />
-        </div>
+        <OpenInAppIconPicker application={application} onSelect={onIconChange} />
 
         <div className="min-w-0 flex-1 sm:min-w-[12rem]">
           <div className="flex items-center gap-2">
@@ -381,6 +395,11 @@ export function OpenInMenuSetting({
                   const next = [...draft]
                   next[index] = { ...application, ...updates }
                   updateDraft(next)
+                }}
+                onIconChange={(icon) => {
+                  const next = [...draft]
+                  next[index] = withOpenInApplicationIcon(application, icon)
+                  applyDraft(next)
                 }}
                 onCommit={() => commit(draft)}
               />

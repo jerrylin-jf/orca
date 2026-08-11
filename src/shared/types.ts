@@ -18,6 +18,7 @@ import type {
 import type { VoiceSettings } from './speech-types'
 import type { WorkspaceCleanupUIState } from './workspace-cleanup'
 import type { LargeDiffRenderLimit } from './large-diff-render-limit'
+import type { OpenInAppIcon } from './open-in-app-icons'
 import type { GitLabProjectSettings } from './gitlab-types'
 import type { TaskProvider } from './task-providers'
 import type { FeatureTipId } from './feature-tips'
@@ -2745,6 +2746,8 @@ export type OpenInApplication = {
   id: string
   label: string
   command: string
+  // Absent means the icon is derived from the command's preset, else a generic glyph.
+  icon?: OpenInAppIcon
 }
 
 export type SourceControlViewMode = 'list' | 'tree'

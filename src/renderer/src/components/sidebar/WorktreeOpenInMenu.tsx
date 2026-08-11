@@ -16,6 +16,7 @@ import { getExternalEditorOpenCapability } from '@/lib/external-editor-open-capa
 import { NO_OPEN_IN_APPLICATIONS } from '@/lib/open-in-application-selection'
 import type { ShellOpenExternalEditorResult } from '../../../../shared/shell-open-types'
 import type { GlobalSettings, OpenInApplication } from '../../../../shared/types'
+import type { OpenInAppIcon } from '../../../../shared/open-in-app-icons'
 import { translate } from '@/i18n/i18n'
 
 export { getLocalFileManagerLabel } from '@/lib/local-file-manager-label'
@@ -32,6 +33,7 @@ export type OpenInMenuEntry = {
   label: string
   target: 'external-editor' | 'file-manager'
   command?: string
+  icon?: OpenInAppIcon
 }
 
 export function getWorktreeOpenInEntries(
@@ -43,7 +45,8 @@ export function getWorktreeOpenInEntries(
       id: application.id,
       label: application.label,
       target: 'external-editor' as const,
-      command: application.command
+      command: application.command,
+      icon: application.icon
     })),
     { id: 'file-manager', label: fileManagerLabel, target: 'file-manager' }
   ]
@@ -326,7 +329,10 @@ export function WorktreeOpenInMenuItems({
             {entry.target === 'file-manager' ? (
               <FolderOpen className="size-3.5" />
             ) : entry.command ? (
-              <OpenInApplicationIcon application={{ command: entry.command }} size={14} />
+              <OpenInApplicationIcon
+                application={{ command: entry.command, icon: entry.icon }}
+                size={14}
+              />
             ) : (
               <ExternalLink className="size-3.5" />
             )}
