@@ -36,6 +36,19 @@ export type OpenInMenuEntry = {
   icon?: OpenInAppIcon
 }
 
+/** Shared so every menu that renders these entries stays in sync on icon changes. */
+export function OpenInMenuEntryIcon({ entry }: { entry: OpenInMenuEntry }): React.JSX.Element {
+  if (entry.target === 'file-manager') {
+    return <FolderOpen className="size-3.5" />
+  }
+  if (!entry.command) {
+    return <ExternalLink className="size-3.5" />
+  }
+  return (
+    <OpenInApplicationIcon application={{ command: entry.command, icon: entry.icon }} size={14} />
+  )
+}
+
 export function getWorktreeOpenInEntries(
   openInApplications: readonly OpenInApplication[],
   fileManagerLabel: string
@@ -326,16 +339,7 @@ export function WorktreeOpenInMenuItems({
             }}
             disabled={disabled || availability.disabled}
           >
-            {entry.target === 'file-manager' ? (
-              <FolderOpen className="size-3.5" />
-            ) : entry.command ? (
-              <OpenInApplicationIcon
-                application={{ command: entry.command, icon: entry.icon }}
-                size={14}
-              />
-            ) : (
-              <ExternalLink className="size-3.5" />
-            )}
+            <OpenInMenuEntryIcon entry={entry} />
             <span className="min-w-0 truncate">
               {labelPrefix}
               {entry.label}

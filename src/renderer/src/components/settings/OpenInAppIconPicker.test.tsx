@@ -57,8 +57,7 @@ describe('OpenInAppIconPicker', () => {
     await waitFor(() =>
       expect(onSelect).toHaveBeenCalledWith({
         type: 'image',
-        src: 'data:image/png;base64,aGk=',
-        label: 'IntelliJ IDEA'
+        src: 'data:image/png;base64,aGk='
       })
     )
   })

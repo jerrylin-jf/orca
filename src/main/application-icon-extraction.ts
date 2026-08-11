@@ -103,21 +103,16 @@ function trimTransparentMargin(image: NativeImage): NativeImage {
   return cropped.width === width && cropped.height === height ? image : image.crop(cropped)
 }
 
-function encodeIconPng(image: NativeImage): Buffer {
+function scaleIconToBox(image: NativeImage): NativeImage {
   const { width, height } = image.getSize()
   // Why: only downscale — upscaling past the pixels the OS gave us just blurs.
   if (Math.max(width, height) <= ICON_MAX_PIXEL_SIZE) {
-    return image.toPNG()
+    return image
   }
   // Why: passing a single dimension preserves the aspect ratio, so a non-square
   // mark is never stretched to fill the box.
-  return image
-    .resize(
-      width >= height
-        ? { width: ICON_MAX_PIXEL_SIZE, quality: 'best' }
-        : { height: ICON_MAX_PIXEL_SIZE, quality: 'best' }
-    )
-    .toPNG()
+  const bound = width >= height ? { width: ICON_MAX_PIXEL_SIZE } : { height: ICON_MAX_PIXEL_SIZE }
+  return image.resize({ ...bound, quality: 'best' })
 }
 
 export async function extractApplicationIcon(filePath: string): Promise<PickedApplicationIcon> {
@@ -127,7 +122,7 @@ export async function extractApplicationIcon(filePath: string): Promise<PickedAp
   }
 
   const artwork = trimTransparentMargin(toFullResolutionImage(image))
-  const dataUrl = `data:image/png;base64,${encodeIconPng(artwork).toString('base64')}`
+  const dataUrl = scaleIconToBox(artwork).toDataURL()
   if (!isOpenInAppIconImageSrc(dataUrl)) {
     throw new Error('That application icon is too large to store.')
   }

@@ -55,7 +55,7 @@ describe('normalizeOpenInApplications', () => {
         id: 'd',
         label: 'Zed',
         command: 'zed',
-        icon: { type: 'image', src: 'data:image/png;base64,aGk=', label: ' Zed ' }
+        icon: { type: 'image', src: 'data:image/png;base64,aGk=' }
       },
       {
         id: 'e',
@@ -79,7 +79,7 @@ describe('normalizeOpenInApplications', () => {
         id: 'd',
         label: 'Zed',
         command: 'zed',
-        icon: { type: 'image', src: 'data:image/png;base64,aGk=', label: 'Zed' }
+        icon: { type: 'image', src: 'data:image/png;base64,aGk=' }
       },
       { id: 'e', label: 'Remote', command: 'ssh' },
       { id: 'f', label: 'Svg', command: 'svg' }

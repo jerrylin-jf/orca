@@ -108,7 +108,7 @@ test.describe('Open In Apps icon picker', () => {
             id: 'idea',
             label: 'IntelliJ IDEA',
             command: 'idea',
-            icon: { type: 'image', src, label: 'IntelliJ IDEA' }
+            icon: { type: 'image', src }
           }
         ]
       })

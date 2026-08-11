@@ -46,15 +46,10 @@ function createOpenInApplication(): OpenInApplication {
 }
 
 export function withOpenInApplicationIcon(
-  application: OpenInApplication,
+  { icon: _cleared, ...application }: OpenInApplication,
   icon: OpenInAppIcon | null
 ): OpenInApplication {
-  if (icon) {
-    return { ...application, icon }
-  }
-  const next = { ...application }
-  delete next.icon
-  return next
+  return icon ? { ...application, icon } : application
 }
 
 export function createPresetOpenInApplication(preset: OpenInAppPreset): OpenInApplication {

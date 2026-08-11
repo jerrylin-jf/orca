@@ -58,7 +58,7 @@ describe('OpenInMenuSetting custom icons', () => {
   it('renders an icon extracted from an installed app', () => {
     const src = 'data:image/png;base64,aGk='
     const icon = OpenInApplicationIcon({
-      application: { command: 'idea', icon: { type: 'image', src, label: 'IntelliJ IDEA' } }
+      application: { command: 'idea', icon: { type: 'image', src } }
     })
 
     expect(icon.type).toBe('img')

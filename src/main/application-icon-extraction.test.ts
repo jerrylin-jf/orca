@@ -36,6 +36,8 @@ function fakeIcon(options: FakeIconOptions): unknown {
     getSize: () => ({ width, height }),
     getScaleFactors: () => options.scaleFactors ?? [1],
     toPNG: () => options.png ?? Buffer.from(`icon-${width}x${height}`),
+    toDataURL: () =>
+      `data:image/png;base64,${(options.png ?? Buffer.from(`icon-${width}x${height}`)).toString('base64')}`,
     toBitmap: () => {
       const bitmap = Buffer.alloc(width * height * 4)
       for (let y = margin; y < height - margin; y += 1) {
@@ -103,8 +105,8 @@ describe('extractApplicationIcon', () => {
     const picked = await extractApplicationIcon('/usr/share/applications/zed.desktop')
 
     expect(picked.dataUrl).toContain('base64,')
-    // Why: this size aborts the macOS main process outright.
-    expect(getFileIconMock.mock.calls[0][1].size).not.toBe('large')
+    // Why: 'large' aborts the macOS main process outright, so pin the one safe size.
+    expect(getFileIconMock.mock.calls[0][1].size).toBe('normal')
   })
 
   it('trims the transparent margin so a padded tile is not rendered smaller', async () => {

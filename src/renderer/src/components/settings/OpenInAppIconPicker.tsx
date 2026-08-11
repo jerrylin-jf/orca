@@ -1,9 +1,8 @@
-import type React from 'react'
-import { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { AppWindowMac, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import type { OpenInApplication } from '../../../../shared/types'
-import { openInAppIconImage, type OpenInAppIcon } from '../../../../shared/open-in-app-icons'
+import type { OpenInAppIcon, OpenInAppIconId } from '../../../../shared/open-in-app-icons'
 import { Button } from '../ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
@@ -12,6 +11,45 @@ import { cn } from '@/lib/utils'
 import { getOpenInAppIconOptions } from '@/lib/open-in-app-icon-set'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
+
+// Why: memoized because the settings rows re-render on every keystroke, and Radix
+// evaluates popover children even while closed — 16 buttons per row otherwise.
+const OpenInAppIconGrid = React.memo(function OpenInAppIconGrid({
+  selectedId,
+  onSelect
+}: {
+  selectedId: OpenInAppIconId | null
+  onSelect: (id: OpenInAppIconId) => void
+}): React.JSX.Element {
+  return (
+    <div className="grid grid-cols-8 gap-1">
+      {getOpenInAppIconOptions().map((option) => (
+        <Tooltip key={option.id}>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant={selectedId === option.id ? 'secondary' : 'ghost'}
+              size="icon-xs"
+              className="size-8"
+              onClick={() => onSelect(option.id)}
+              aria-label={translate(
+                'auto.components.settings.OpenInAppIconPicker.useIcon',
+                'Use {{value0}} icon',
+                { value0: option.label }
+              )}
+              aria-pressed={selectedId === option.id}
+            >
+              <option.icon className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" sideOffset={4}>
+            {option.label}
+          </TooltipContent>
+        </Tooltip>
+      ))}
+    </div>
+  )
+})
 
 export function OpenInAppIconPicker({
   application,
@@ -28,10 +66,17 @@ export function OpenInAppIconPicker({
   // sitting inside it. A glyph still needs the frame to read as a control.
   const hasAppIcon = application.icon?.type === 'image'
 
-  const select = (icon: OpenInAppIcon | null): void => {
-    onSelect(icon)
-    setOpen(false)
-  }
+  const select = useCallback(
+    (icon: OpenInAppIcon | null): void => {
+      onSelect(icon)
+      setOpen(false)
+    },
+    [onSelect]
+  )
+  const selectBundled = useCallback(
+    (id: OpenInAppIconId): void => select({ type: 'bundled', id }),
+    [select]
+  )
 
   const chooseApplication = async (): Promise<void> => {
     setPicking(true)
@@ -41,7 +86,7 @@ export function OpenInAppIconPicker({
         return
       }
       if (picked) {
-        select(openInAppIconImage(picked.dataUrl, picked.label))
+        select({ type: 'image', src: picked.dataUrl })
       }
     } catch (error) {
       // Why: the icon lives inside a signed app bundle on macOS and a packed
@@ -54,11 +99,14 @@ export function OpenInAppIconPicker({
         { description: error instanceof Error ? error.message : undefined }
       )
     } finally {
-      if (mountedRef.current) {
-        setPicking(false)
-      }
+      setPicking(false)
     }
   }
+
+  const changeIconLabel = translate(
+    'auto.components.settings.OpenInAppIconPicker.changeIcon',
+    'Change app icon'
+  )
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -71,14 +119,8 @@ export function OpenInAppIconPicker({
             'size-7 shrink-0 overflow-hidden',
             hasAppIcon && 'p-0 hover:bg-transparent hover:opacity-80'
           )}
-          title={translate(
-            'auto.components.settings.OpenInAppIconPicker.changeIcon',
-            'Change app icon'
-          )}
-          aria-label={translate(
-            'auto.components.settings.OpenInAppIconPicker.changeIcon',
-            'Change app icon'
-          )}
+          title={changeIconLabel}
+          aria-label={changeIconLabel}
         >
           {/* `size` governs only the glyph fallback, which Button pins to size-4 anyway. */}
           <OpenInApplicationIcon
@@ -89,32 +131,7 @@ export function OpenInAppIconPicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto space-y-2 p-2">
-        <div className="grid grid-cols-8 gap-1">
-          {getOpenInAppIconOptions().map((option) => (
-            <Tooltip key={option.id}>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant={selectedId === option.id ? 'secondary' : 'ghost'}
-                  size="icon-xs"
-                  className="size-8"
-                  onClick={() => select({ type: 'bundled', id: option.id })}
-                  aria-label={translate(
-                    'auto.components.settings.OpenInAppIconPicker.useIcon',
-                    'Use {{value0}} icon',
-                    { value0: option.label }
-                  )}
-                  aria-pressed={selectedId === option.id}
-                >
-                  <option.icon className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top" sideOffset={4}>
-                {option.label}
-              </TooltipContent>
-            </Tooltip>
-          ))}
-        </div>
+        <OpenInAppIconGrid selectedId={selectedId} onSelect={selectBundled} />
         <div className="space-y-1">
           <Button
             type="button"
