@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_OPEN_IN_APPLICATIONS, normalizeOpenInApplications } from './open-in-applications'
 import { MAX_OPEN_IN_APP_ICON_DATA_URL_LENGTH } from './open-in-app-icons'
 
+// A 1x1 PNG, standing in for what icon extraction returns for a picked app.
+const PNG_1X1_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
 describe('normalizeOpenInApplications', () => {
   it('trims fields, drops invalid rows, keeps first duplicate id, and caps list', () => {
     const rows = normalizeOpenInApplications([
@@ -55,7 +59,7 @@ describe('normalizeOpenInApplications', () => {
         id: 'd',
         label: 'Zed',
         command: 'zed',
-        icon: { type: 'image', src: 'data:image/png;base64,aGk=' }
+        icon: { type: 'image', src: PNG_1X1_DATA_URL }
       },
       {
         id: 'e',
@@ -79,7 +83,7 @@ describe('normalizeOpenInApplications', () => {
         id: 'd',
         label: 'Zed',
         command: 'zed',
-        icon: { type: 'image', src: 'data:image/png;base64,aGk=' }
+        icon: { type: 'image', src: PNG_1X1_DATA_URL }
       },
       { id: 'e', label: 'Remote', command: 'ssh' },
       { id: 'f', label: 'Svg', command: 'svg' }

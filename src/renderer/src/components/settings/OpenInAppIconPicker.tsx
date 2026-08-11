@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import React, { useState } from 'react'
 import { AppWindowMac, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import type { OpenInApplication } from '../../../../shared/types'
@@ -12,9 +12,7 @@ import { getOpenInAppIconOptions } from '@/lib/open-in-app-icon-set'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
 
-// Why: memoized because the settings rows re-render on every keystroke, and Radix
-// evaluates popover children even while closed — 16 buttons per row otherwise.
-const OpenInAppIconGrid = React.memo(function OpenInAppIconGrid({
+function OpenInAppIconGrid({
   selectedId,
   onSelect
 }: {
@@ -49,7 +47,7 @@ const OpenInAppIconGrid = React.memo(function OpenInAppIconGrid({
       ))}
     </div>
   )
-})
+}
 
 export function OpenInAppIconPicker({
   application,
@@ -66,17 +64,10 @@ export function OpenInAppIconPicker({
   // sitting inside it. A glyph still needs the frame to read as a control.
   const hasAppIcon = application.icon?.type === 'image'
 
-  const select = useCallback(
-    (icon: OpenInAppIcon | null): void => {
-      onSelect(icon)
-      setOpen(false)
-    },
-    [onSelect]
-  )
-  const selectBundled = useCallback(
-    (id: OpenInAppIconId): void => select({ type: 'bundled', id }),
-    [select]
-  )
+  const select = (icon: OpenInAppIcon | null): void => {
+    onSelect(icon)
+    setOpen(false)
+  }
 
   const chooseApplication = async (): Promise<void> => {
     setPicking(true)
@@ -131,7 +122,10 @@ export function OpenInAppIconPicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto space-y-2 p-2">
-        <OpenInAppIconGrid selectedId={selectedId} onSelect={selectBundled} />
+        <OpenInAppIconGrid
+          selectedId={selectedId}
+          onSelect={(id) => select({ type: 'bundled', id })}
+        />
         <div className="space-y-1">
           <Button
             type="button"
