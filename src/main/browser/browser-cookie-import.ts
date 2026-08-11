@@ -561,7 +561,8 @@ async function importValidatedCookies(
   cookies: ValidatedCookie[],
   totalInput: number,
   targetPartition: string,
-  mode: CookieImportMode
+  mode: CookieImportMode,
+  googleCookiesPresent: boolean
 ): Promise<BrowserCookieImportResult> {
   const importDomainCache = new Map<string, boolean>()
   const validDomainCookies = cookies.filter((cookie) => {
@@ -686,8 +687,7 @@ async function importValidatedCookies(
     importedCookies: importedCount,
     skippedCookies: skipped,
     domains: [...domainSet].sort(),
-    // Why: checked on the source snapshot (pre-filter) — the notice is about what the user tried to import.
-    googleCookiesPresent: cookies.some((cookie) => isGoogleSessionDomain(cookie.domain))
+    googleCookiesPresent
   }
 
   return { ok: true, profileId: '', summary }
@@ -745,12 +745,17 @@ export async function importCookiesFromFile(
 
   const validated: ValidatedCookie[] = []
   let skipped = 0
+  let googleCookiesPresent = false
   for (const entry of parsed) {
     if (typeof entry !== 'object' || entry === null) {
       skipped++
       continue
     }
-    const cookie = validateCookieEntry(entry as RawCookieEntry)
+    const rawCookie = entry as RawCookieEntry
+    if (typeof rawCookie.domain === 'string' && isGoogleSessionDomain(rawCookie.domain)) {
+      googleCookiesPresent = true
+    }
+    const cookie = validateCookieEntry(rawCookie)
     if (cookie) {
       validated.push(cookie)
     } else {
@@ -769,7 +774,8 @@ export async function importCookiesFromFile(
     validated,
     parsed.length,
     targetPartition,
-    'replace-imported-domains'
+    'replace-imported-domains',
+    googleCookiesPresent
   )
 }
 
@@ -1318,7 +1324,15 @@ async function importCookiesFromFirefox(
 
     const now = Math.floor(Date.now() / 1000)
     const validated: ValidatedCookie[] = []
+    let googleCookiesPresent = false
     for (const row of rows) {
+      if (
+        !googleCookiesPresent &&
+        typeof row.host === 'string' &&
+        isGoogleSessionDomain(row.host)
+      ) {
+        googleCookiesPresent = true
+      }
       if (!row.name || !row.host) {
         continue
       }
@@ -1356,7 +1370,8 @@ async function importCookiesFromFirefox(
       validated,
       rows.length,
       targetPartition,
-      'replace-imported-domains'
+      'replace-imported-domains',
+      googleCookiesPresent
     )
   } catch (err) {
     rmSync(tmpDir, { recursive: true, force: true })
@@ -1405,7 +1420,13 @@ async function importCookiesFromSafari(
     }
 
     const now = Math.floor(Date.now() / 1000)
-    const valid = cookies.filter((c) => !c.expirationDate || c.expirationDate > now)
+    let googleCookiesPresent = false
+    const valid = cookies.filter((cookie) => {
+      if (!googleCookiesPresent && isGoogleSessionDomain(cookie.domain)) {
+        googleCookiesPresent = true
+      }
+      return !cookie.expirationDate || cookie.expirationDate > now
+    })
 
     if (valid.length === 0) {
       return { ok: false, reason: 'All Safari cookies are expired.' }
@@ -1415,7 +1436,8 @@ async function importCookiesFromSafari(
       valid,
       cookies.length,
       targetPartition,
-      'replace-imported-domains'
+      'replace-imported-domains',
+      googleCookiesPresent
     )
   } catch (err) {
     diag(`  Safari import failed: ${String(err)}`)
@@ -1573,21 +1595,27 @@ export async function importCookiesFromBrowser(
 
     diag(`  source has ${sourceRows.length} cookies`)
 
-    // Why: checked on the source snapshot (pre-filter) — the notice is about what the user tried to import.
-    const googleCookiesPresent = sourceRows.some(
-      (row) => typeof row.host_key === 'string' && isGoogleSessionDomain(row.host_key)
-    )
-
     if (sourceRows.length === 0) {
       closeStagingDb()
       discardStagingFile()
       return { ok: false, reason: `No cookies found in ${browser.label}.` }
     }
 
-    const needsSourceKey = sourceRows.some((sourceRow) => {
+    let googleCookiesPresent = false
+    let needsSourceKey = false
+    for (const sourceRow of sourceRows) {
+      if (
+        !googleCookiesPresent &&
+        typeof sourceRow.host_key === 'string' &&
+        isGoogleSessionDomain(sourceRow.host_key)
+      ) {
+        googleCookiesPresent = true
+      }
       const encRaw = sourceRow.encrypted_value
-      return encRaw instanceof Uint8Array && encRaw.length > 0
-    })
+      if (encRaw instanceof Uint8Array && encRaw.length > 0) {
+        needsSourceKey = true
+      }
+    }
     const sourceKey = needsSourceKey
       ? getEncryptionKey(browser.keychainService!, browser.keychainAccount!, browser)
       : null
