@@ -1,5 +1,5 @@
 import { normalizeOpenInAppIcon } from './open-in-app-icons'
-import type { OpenInApplication } from './types'
+import type { OpenInApplication } from './ui-chrome-types'
 
 export const OPEN_IN_APPLICATIONS_MAX = 8
 export const DEFAULT_OPEN_IN_APPLICATIONS: OpenInApplication[] = [

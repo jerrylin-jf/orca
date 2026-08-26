@@ -14,6 +14,8 @@ import { shouldEnableReactGrab } from './lib/react-grab-dev-gate'
 import { I18nProvider } from './i18n/I18nProvider'
 import { translate } from './i18n/i18n'
 import { getOrCreateRendererRoot } from './lib/react-renderer-root'
+import { SkillWarningPreviewLauncher } from './components/skills/SkillWarningPreviewLauncher'
+import { installBrowserClientPageRenderer } from './components/browser-pane/browser-client-page-renderer-installation'
 
 recordRendererCrashBreadcrumb('renderer_bootstrap_started', { dev: import.meta.env.DEV })
 installRendererCrashDiagnostics()
@@ -31,6 +33,8 @@ if (
 }
 
 applyDocumentTheme('system', { disableTransitions: false })
+const browserClientPageRenderer = installBrowserClientPageRenderer()
+import.meta.hot?.dispose(() => browserClientPageRenderer?.dispose())
 
 const rootElement = document.getElementById('root')
 if (!rootElement) {
@@ -51,6 +55,7 @@ function RendererRoot(): React.JSX.Element {
       )}
     >
       <App />
+      <SkillWarningPreviewLauncher />
     </RecoverableRenderErrorBoundary>
   )
 }

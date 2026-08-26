@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { AppWindowMac, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
-import type { OpenInApplication } from '../../../../shared/types'
+import type { OpenInApplication } from '../../../../shared/ui-chrome-types'
 import type { OpenInAppIcon, OpenInAppIconId } from '../../../../shared/open-in-app-icons'
 import { Button } from '../ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'

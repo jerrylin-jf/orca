@@ -10,13 +10,13 @@ let tempHome = ''
 
 async function loadModule() {
   vi.resetModules()
-  vi.doMock('electron', () => ({
-    safeStorage: {
-      isEncryptionAvailable: () => true,
-      encryptString: (value: string) => Buffer.from(value),
-      decryptString: (value: Buffer) => value.toString('utf-8')
-    }
-  }))
+  const { setSecretStore } = await import('../../shared/secret-store')
+  setSecretStore({
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(value),
+    decryptString: (value) => value.toString('utf-8'),
+    describeProtectionGap: () => null
+  })
   vi.doMock('node:os', async () => {
     const actual = await vi.importActual<typeof Os>('node:os')
     return { ...actual, homedir: () => tempHome }
@@ -92,6 +92,30 @@ describe('Bitbucket credential connection', () => {
       accessToken: 'bad'
     })
     expect(result.ok).toBe(false)
+    expect(conn.getBitbucketConnectionStatus().source).toBe('none')
+  })
+
+  it('separates a rejected credential from an unreachable host (STA-3944)', async () => {
+    const conn = await loadModule()
+
+    globalThis.fetch = vi.fn(
+      async () => new Response(null, { status: 401 })
+    ) as unknown as typeof fetch
+    const rejected = await conn.connectBitbucket({ authMode: 'token', accessToken: 'bad' })
+    expect(!rejected.ok && rejected.error).toMatch(/rejected these credentials/i)
+
+    // Why: a timeout or 5xx says nothing about the token; calling it invalid
+    // sends the user off to regenerate a credential that still works.
+    for (const failure of [
+      async () => {
+        throw new Error('network down')
+      },
+      async () => new Response(null, { status: 503 })
+    ]) {
+      globalThis.fetch = vi.fn(failure) as unknown as typeof fetch
+      const unreachable = await conn.connectBitbucket({ authMode: 'token', accessToken: 'good' })
+      expect(!unreachable.ok && unreachable.error).toMatch(/could not reach bitbucket/i)
+    }
     expect(conn.getBitbucketConnectionStatus().source).toBe('none')
   })
 

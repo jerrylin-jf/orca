@@ -1,7 +1,6 @@
 import React from 'react'
-import { Plus, RefreshCw } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type {
   Automation,
@@ -11,33 +10,45 @@ import type {
   ExternalAutomationManager
 } from '../../../../shared/automations-types'
 import type { SshConnectionState } from '../../../../shared/ssh-types'
-import type { ProjectHostSetup, Repo, Worktree } from '../../../../shared/types'
+import type { ProjectHostSetup } from '../../../../shared/project-types'
+import type { Repo } from '../../../../shared/repo-types'
+import type { Worktree } from '../../../../shared/worktree/types'
 import type { RuntimeStatus } from '../../../../shared/runtime-types'
 import type { TaskSourceHostAvailability } from '../task-source-context-summary'
 import type { AutomationHostTarget } from './automation-host-client'
-import { clampAutomationListSearchQueryInput } from './automation-list-search'
 import type { AutomationPaneTab } from './automation-page-state'
-import { AutomationListSearchField } from './AutomationListSearchField'
 import { getAutomationTemplates, type AutomationTemplate } from './automation-templates'
-import type { ExternalAutomationListEntry } from './external-automation-list-entries'
 import { AutomationListLocalRows } from './AutomationListLocalRows'
 import { AutomationListExternalRows } from './AutomationListExternalRows'
-import {
-  AUTOMATIONS_TABLE_CONTAINER_CLASS,
-  AUTOMATIONS_TABLE_GRID_CLASS,
-  AUTOMATIONS_TABLE_HEADER_CLASS
-} from './automations-table-layout'
+import { LIST_TABLE_CONTAINER_CLASS } from '@/lib/list-table-layout'
 import { translate } from '@/i18n/i18n'
+import type {
+  AutomationListFilter,
+  AutomationListSort,
+  AutomationListSortField,
+  AutomationListViewItem
+} from './automation-list-view'
+import { AutomationListTableHeader } from './AutomationListTableHeader'
+import { AutomationListToolbar } from './AutomationListToolbar'
+import { indexLatestAutomationRuns } from './automation-list-last-run'
+import {
+  getAutomationListArrowNavigationTarget,
+  type AutomationListArrowKey
+} from './automation-list-keyboard-navigation'
 
 type AutomationsListPanelProps = {
   hasListItems: boolean
   hasFilteredListItems: boolean
   isListSearchActive: boolean
+  isListFilterActive: boolean
   listSearchQuery: string
   isListSearchQueryTooLarge: boolean
   onListSearchQueryChange: (query: string) => void
-  filteredAutomations: readonly Automation[]
-  filteredExternalAutomationEntries: readonly ExternalAutomationListEntry[]
+  visibleItems: readonly AutomationListViewItem[]
+  listFilter: AutomationListFilter
+  onListFilterChange: (filter: AutomationListFilter) => void
+  listSort: AutomationListSort | null
+  onListSort: (field: AutomationListSortField) => void
   // Why: use explicit ids, not resolved detail selection (which falls back to the
   // first row) — list highlight should only mark a user-chosen row.
   selectedId: string | null
@@ -79,11 +90,15 @@ export function AutomationsListPanel({
   hasListItems,
   hasFilteredListItems,
   isListSearchActive,
+  isListFilterActive,
   listSearchQuery,
   isListSearchQueryTooLarge,
   onListSearchQueryChange,
-  filteredAutomations,
-  filteredExternalAutomationEntries,
+  visibleItems,
+  listFilter,
+  onListFilterChange,
+  listSort,
+  onListSort,
   selectedId,
   selectedExternalKey,
   runs,
@@ -111,6 +126,66 @@ export function AutomationsListPanel({
   onRefresh,
   isRefreshing
 }: AutomationsListPanelProps): React.JSX.Element {
+  // Why: one pass over runs for the whole list — each row renders its own
+  // component, so indexing per row would be O(rows × runs) on every re-render.
+  const lastRunByAutomationId = React.useMemo(() => indexLatestAutomationRuns(runs), [runs])
+  const listScrollRef = React.useRef<HTMLDivElement>(null)
+  const pendingKeyboardScrollRef = React.useRef(false)
+
+  const handleSearchArrowNavigate = React.useCallback(
+    (key: AutomationListArrowKey) => {
+      const next = getAutomationListArrowNavigationTarget({
+        items: visibleItems,
+        selectedId,
+        selectedExternalKey,
+        key
+      })
+      if (!next) {
+        return
+      }
+      const alreadySelected =
+        next.kind === 'local'
+          ? selectedExternalKey === null && selectedId === next.id
+          : selectedExternalKey === next.id
+      if (alreadySelected) {
+        listScrollRef.current
+          ?.querySelector('[data-current="true"]')
+          ?.scrollIntoView({ block: 'nearest' })
+        return
+      }
+      pendingKeyboardScrollRef.current = true
+      // Why: arrows only move the highlight — detail is a full-page drill-in that
+      // unmounts this list, so opening it here would end navigation on first press.
+      if (next.kind === 'local') {
+        selectExternalKey(null)
+        selectAutomationId(next.id)
+      } else {
+        selectAutomationId(null)
+        selectExternalKey(next.id)
+        // External items have no runs tab; keep the pane tab valid for the next open.
+        setActivePaneTab('overview')
+      }
+    },
+    [
+      selectAutomationId,
+      selectExternalKey,
+      selectedExternalKey,
+      selectedId,
+      setActivePaneTab,
+      visibleItems
+    ]
+  )
+
+  React.useEffect(() => {
+    if (!pendingKeyboardScrollRef.current) {
+      return
+    }
+    pendingKeyboardScrollRef.current = false
+    listScrollRef.current
+      ?.querySelector('[data-current="true"]')
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [selectedExternalKey, selectedId])
+
   return (
     <section
       className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pb-4 md:px-5"
@@ -153,149 +228,83 @@ export function AutomationsListPanel({
           </div>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
-          <div className="flex shrink-0 items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <AutomationListSearchField
-                query={listSearchQuery}
-                isTooLarge={isListSearchQueryTooLarge}
-                className="w-full max-w-xs"
-                onQueryChange={(query) =>
-                  onListSearchQueryChange(clampAutomationListSearchQueryInput(query))
-                }
-                onClear={() => onListSearchQueryChange('')}
-              />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={translate(
-                      'auto.components.automations.AutomationsPage.19a6e30eae',
-                      'Refresh automations'
-                    )}
-                    onClick={onRefresh}
-                    disabled={isRefreshing}
-                    className="shrink-0 border border-border bg-background shadow-none hover:bg-muted/50"
-                  >
-                    <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={6}>
-                  {translate(
-                    'auto.components.automations.AutomationsPage.19a6e30eae',
-                    'Refresh automations'
-                  )}
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              className="shrink-0"
-              onClick={() => openCreateDialog()}
-              data-contextual-tour-target="automations-create"
-            >
-              <Plus className="size-4" />
-              {translate(
-                'auto.components.automations.AutomationsPage.newAutomation',
-                'New Automation'
-              )}
-            </Button>
-          </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-4">
+          <AutomationListToolbar
+            listSearchQuery={listSearchQuery}
+            isListSearchQueryTooLarge={isListSearchQueryTooLarge}
+            onListSearchQueryChange={onListSearchQueryChange}
+            onSearchArrowNavigate={handleSearchArrowNavigate}
+            filter={listFilter}
+            onFilterChange={onListFilterChange}
+            onRefresh={onRefresh}
+            isRefreshing={isRefreshing}
+            openCreateDialog={openCreateDialog}
+          />
 
           <div
+            ref={listScrollRef}
             className={cn(
               'scrollbar-sleek min-h-0 flex-1 overflow-auto',
-              AUTOMATIONS_TABLE_CONTAINER_CLASS
+              LIST_TABLE_CONTAINER_CLASS
             )}
           >
             {hasFilteredListItems ? (
               <>
-                <div className={cn(AUTOMATIONS_TABLE_GRID_CLASS, AUTOMATIONS_TABLE_HEADER_CLASS)}>
-                  <span>
-                    {translate('auto.components.automations.AutomationsPage.tableName', 'Name')}
-                  </span>
-                  <span>
-                    {translate(
-                      'auto.components.automations.AutomationDetail.18763ded26',
-                      'Schedule'
-                    )}
-                  </span>
-                  <span>
-                    {translate(
-                      'auto.components.automations.AutomationsPage.tableProject',
-                      'Project'
-                    )}
-                  </span>
-                  <span>
-                    {translate(
-                      'auto.components.automations.AutomationDetail.578ff46987',
-                      'Next run'
-                    )}
-                  </span>
-                  <span>
-                    {translate('auto.components.automations.AutomationsPage.tableStatus', 'Status')}
-                  </span>
-                  <span className="text-center">
-                    {translate('auto.components.automations.AutomationDetail.2df8970cd5', 'Agent')}
-                  </span>
-                  <span className="sr-only">
-                    {translate(
-                      'auto.components.automations.AutomationsPage.tableActions',
-                      'Actions'
-                    )}
-                  </span>
-                </div>
+                <AutomationListTableHeader sort={listSort} onSort={onListSort} />
                 <div className="divide-y divide-border/50">
-                  <AutomationListLocalRows
-                    automations={filteredAutomations}
-                    selectedId={selectedId}
-                    isSelectedLocal={selectedExternalKey === null}
-                    runs={runs}
-                    relativeNow={relativeNow}
-                    repoMap={repoMap}
-                    worktreeMap={worktreeMap}
-                    projectHostSetups={projectHostSetups}
-                    sshConnectionStates={sshConnectionStates}
-                    runtimeStatusByEnvironmentId={runtimeStatusByEnvironmentId}
-                    automationHostTarget={automationHostTarget}
-                    automationSourceHostAvailabilityById={automationSourceHostAvailabilityById}
-                    hostLabelById={hostLabelById}
-                    onSelect={(automationId) => {
-                      selectExternalKey(null)
-                      selectAutomationId(automationId)
-                      onOpenDetail()
-                    }}
-                    onRunNow={runNow}
-                    onEdit={openEditDialog}
-                    onToggle={toggleAutomation}
-                    onDelete={requestDeleteAutomation}
-                  />
-                  <AutomationListExternalRows
-                    entries={filteredExternalAutomationEntries}
-                    selectedExternalKey={selectedExternalKey}
-                    relativeNow={relativeNow}
-                    sshConnectionStates={sshConnectionStates}
-                    externalActionKey={externalActionKey}
-                    onSelect={(entryKey) => {
-                      selectAutomationId(null)
-                      selectExternalKey(entryKey)
-                      setActivePaneTab('overview')
-                      onOpenDetail()
-                    }}
-                    onRequestAction={requestExternalAction}
-                    onEdit={openEditExternalDialog}
-                  />
+                  {visibleItems.map((item) =>
+                    item.kind === 'local' ? (
+                      <AutomationListLocalRows
+                        key={item.id}
+                        automations={[item.automation]}
+                        selectedId={selectedId}
+                        isSelectedLocal={selectedExternalKey === null}
+                        lastRunByAutomationId={lastRunByAutomationId}
+                        relativeNow={relativeNow}
+                        repoMap={repoMap}
+                        worktreeMap={worktreeMap}
+                        projectHostSetups={projectHostSetups}
+                        sshConnectionStates={sshConnectionStates}
+                        runtimeStatusByEnvironmentId={runtimeStatusByEnvironmentId}
+                        automationHostTarget={automationHostTarget}
+                        automationSourceHostAvailabilityById={automationSourceHostAvailabilityById}
+                        hostLabelById={hostLabelById}
+                        onSelect={(automationId) => {
+                          selectExternalKey(null)
+                          selectAutomationId(automationId)
+                          onOpenDetail()
+                        }}
+                        onRunNow={runNow}
+                        onEdit={openEditDialog}
+                        onToggle={toggleAutomation}
+                        onDelete={requestDeleteAutomation}
+                      />
+                    ) : (
+                      <AutomationListExternalRows
+                        key={item.id}
+                        entries={[item.entry]}
+                        selectedExternalKey={selectedExternalKey}
+                        relativeNow={relativeNow}
+                        sshConnectionStates={sshConnectionStates}
+                        externalActionKey={externalActionKey}
+                        onSelect={(entryKey) => {
+                          selectAutomationId(null)
+                          selectExternalKey(entryKey)
+                          setActivePaneTab('overview')
+                          onOpenDetail()
+                        }}
+                        onRequestAction={requestExternalAction}
+                        onEdit={openEditExternalDialog}
+                      />
+                    )
+                  )}
                 </div>
               </>
-            ) : isListSearchActive ? (
+            ) : isListSearchActive || isListFilterActive ? (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">
                 {translate(
-                  'auto.components.automations.AutomationsPage.noSearchMatches',
-                  'No automations match your search.'
+                  'auto.components.automations.AutomationsPage.noListMatches',
+                  'No automations match.'
                 )}
               </div>
             ) : null}
